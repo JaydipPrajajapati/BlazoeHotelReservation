@@ -1,0 +1,60 @@
+﻿@page "/room"
+@page "/room/list"
+@attribute [Authorize]
+<div class="row">
+    <div class="col-lg-9">
+        <h1>Rooms Details</h1>
+    </div>
+</div>
+
+@if (Rooms != null && Rooms.Count > 0)
+{
+    <table class="table table-bordered table-striped table-sm">
+        <thead>
+            <tr>
+                <th>Room Number</th>
+                <th>Room Type</th>
+                <th>Base Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Rooms)
+            {
+                <tr>
+                    <td>@item.Number</td>
+                    <td>@item.RoomType.Name</td>
+                    <td>@item.RoomType.BasePrice</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    [Inject]
+    protected RoomService RoomService { get; set; }
+
+    private List<Room> Rooms { get; set; }
+
+    [Inject]
+    UserManager<ApplicationUser> userManager { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await authenticationStateTask).User;
+        if (user.Identity.IsAuthenticated)
+        {
+            var currentUser = await userManager.GetUserAsync(user);
+            var currentUserId = currentUser.Id;
+            var currentUserEmail = currentUser.Email;
+            var currentUserPhone = currentUser.PhoneNumber;
+            var currentUserEmailConfirmed = currentUser.EmailConfirmed;
+            Rooms = await RoomService.Get();
+        }
+
+    }
+
+}

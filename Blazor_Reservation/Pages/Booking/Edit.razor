@@ -1,0 +1,118 @@
+﻿@page "/booking/edit/{id:int}"
+@inject IHttpContextAccessor httpContextAccessor
+@inject AuthenticationStateProvider GetAuthenticationStateAsync
+@attribute [Authorize]
+<div class="row">
+    <div class="col-lg-9">
+        <h1>Edit</h1>
+    </div>
+    <div class="col-lg-3 text-right">
+        <a class="btn btn-secondary btn-sm" href="/booking" role="button">Go Back To List</a>
+    </div>
+</div>
+
+@if (Bookings != null)
+{
+    <EditForm Model="@Bookings" OnValidSubmit="@SubmitBooking">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <CustomValidator @ref="customValidator"></CustomValidator>
+
+        <div class="form-group">
+            <label>Room</label>
+            <InputSelect @bind-Value="Bookings.RoomID" class="form-control">
+                @if (Rooms != null)
+                {
+                    <option value="">--Select Room--</option>
+                    @foreach (var room in Rooms)
+                    {
+                        <option value="@room.ID">@room.Number</option>
+                    }
+                }
+            </InputSelect>
+
+        </div>
+        <div class="form-group">
+            <label>No Of Guest</label>
+            <InputNumber class="form-control" @bind-Value="Bookings.Guests" />
+        </div>
+        <div class="form-group">
+            <label>Check In</label>
+            <InputDate class="form-control" @bind-Value="Bookings.CheckIn" />
+        </div>
+        <div class="form-group">
+            <label>Check Out</label>
+            <InputDate class="form-control" @bind-Value="Bookings.CheckOut" />
+        </div>
+        <button type="submit" class="btn btn-primary">Update</button>
+    </EditForm>
+}
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    [Inject]
+    UserManager<ApplicationUser> userManager { get; set; }
+    public string UserName;
+
+    [Inject]
+    protected BookingService BookingsService { get; set; }
+
+    [Inject]
+    protected RoomService RoomsService { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+    private CustomValidator customValidator;
+
+    public Booking Bookings { get; set; }
+    private List<Room> Rooms { get; set; }
+    public Room SelectedRoom { get; set; }
+
+    [Parameter]
+    public int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Bookings = new Booking();
+        Bookings = await BookingsService.GetBookingById(Id);
+        
+        Rooms = await RoomsService.Get();
+    }
+
+    private async void SubmitBooking()
+    {
+        var errors = new Dictionary<string, List<string>>();
+        if (await BookingsService.IsBookingExist(Bookings))
+        {
+            errors.Add("Booking", new List<string> { "This Room Booking already exists for particular dates." });
+        }
+        if (errors.Count > 0)
+        {
+            customValidator.DisplayErrors(errors);
+        }
+        else
+        {
+            var user = (await authenticationStateTask).User;
+            if (user.Identity.IsAuthenticated)
+            {
+                var currentUser = await userManager.GetUserAsync(user);
+                var currentUserId = currentUser.Id;
+                var currentUserEmail = currentUser.Email;
+                var currentUserPhone = currentUser.PhoneNumber;
+                var currentUserEmailConfirmed = currentUser.EmailConfirmed;
+                Bookings.UserId = currentUser.Id;
+                Bookings.CustomerEmail = currentUser.Email;
+                Bookings.CustomerName = currentUser.UserName;
+                var roomBasePrice = Rooms.Where(a => a.ID == Bookings.RoomID).Select(a => a.RoomType.BasePrice).FirstOrDefault();
+                var noOfDays = (int)((Bookings.CheckOut - Bookings.CheckIn).TotalDays) + 1;
+                Bookings.TotalFee = (int)roomBasePrice * noOfDays * Bookings.Guests;
+                Bookings.Paid = true;
+                await BookingsService.UpdateBooking(Bookings);
+            }
+
+            NavigationManager.NavigateTo("/booking");
+        }
+
+    }
+}

@@ -1,0 +1,88 @@
+﻿@page "/booking"
+@page "/booking/list"
+@attribute [Authorize]
+<div class="row">
+    <div class="col-lg-9">
+        <h1>Bookings</h1>
+    </div>
+    <div class="col-lg-3 text-right">
+        <a class="btn btn-success btn-sm" href="/booking/create" role="button">Create New</a>
+    </div>
+</div>
+
+@if (Bookings != null && Bookings.Count > 0)
+{
+    <table class="table table-bordered table-striped table-sm">
+        <thead>
+            <tr>
+                <th>Room Number</th>
+                <th>Check In</th>
+                <th>Check Out</th>
+                <th>No Of Guest</th>
+                <th>Total Fee</th>
+                <th>Paid</th>
+                <th>Customer Name</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Bookings)
+            {
+                <tr>
+                    <td>@item.Room.Number</td>
+                    <td>@item.CheckIn</td>
+                    <td>@item.CheckOut</td>
+                    <td>@item.Guests</td>
+                    <td>@item.TotalFee</td>
+                    <td>@item.Paid</td>
+                    <td>@item.CustomerName</td>
+                    <td class="text-right">
+                        <a class="btn btn-secondary btn-sm" href="/booking/edit/@item.ID" role="button">Edit</a>
+                        <button class="btn btn-danger btn-sm" @onclick="@(e => DeleteBooking(item.ID))" role="button">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    [Inject]
+    protected BookingService BookingService { get; set; }
+
+    private List<Booking> Bookings { get; set; }
+
+    [Inject]
+    UserManager<ApplicationUser> userManager { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await authenticationStateTask).User;
+        if (user.Identity.IsAuthenticated)
+        {
+            var currentUser = await userManager.GetUserAsync(user);
+            var currentUserId = currentUser.Id;
+            var currentUserEmail = currentUser.Email;
+            var currentUserPhone = currentUser.PhoneNumber;
+            var currentUserEmailConfirmed = currentUser.EmailConfirmed;
+            Bookings = await BookingService.GetBookingList();
+            Bookings = Bookings.Where(a => a.UserId == currentUser.Id).ToList();
+        }
+        
+    }
+
+    public async Task DeleteBooking(int bookingId)
+    {
+
+        var booking = await BookingService.GetBookingById(bookingId);
+        if (booking != null)
+        {
+            await BookingService.DeleteBooking(booking.ID);
+
+            Bookings.RemoveAll(x => x.ID == bookingId);
+        }
+    }
+}
